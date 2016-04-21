@@ -21,18 +21,18 @@
 /**************************************************************************
  * Public Definitions
  **************************************************************************/
-#define MIN_ORDER 12
-#define MAX_ORDER 20
+#define MIN_ORDER 12//4kb min size(page size)
+#define MAX_ORDER 20//1mg total size
 
-#define PAGE_SIZE (1<<MIN_ORDER)
+#define PAGE_SIZE (1<<MIN_ORDER) // page size = 4kb
 /* page index to address */
-#define PAGE_TO_ADDR(page_idx) (void *)((page_idx*PAGE_SIZE) + g_memory)
+#define PAGE_TO_ADDR(page_idx) (void *)(((page_idx)*PAGE_SIZE) + g_memory)//returns a pointer to the page index
 
 /* address to page index */
-#define ADDR_TO_PAGE(addr) ((unsigned long)((void *)addr - (void *)g_memory) / PAGE_SIZE)
+#define ADDR_TO_PAGE(addr) ((unsigned long)(((void *)(addr)) - (void *)g_memory) / PAGE_SIZE)//returns a page index from a pointer
 
 /* find buddy address */
-#define BUDDY_ADDR(addr, o) (void *)((((unsigned long)addr - (unsigned long)g_memory) ^ (1<<o)) \
+#define BUDDY_ADDR(addr, order) (void *)((((unsigned long)(addr) - (unsigned long)g_memory) ^ (1<<(order))) \ //returns a pointer to the memory's buddy.(args = address,order)
 									 + (unsigned long)g_memory)
 
 #if USE_DEBUG == 1
@@ -45,25 +45,27 @@
 #  define IFDEBUG(x)
 #endif
 
+
 /**************************************************************************
  * Public Types
  **************************************************************************/
 typedef struct {
-	struct list_head list;
+	struct list_head list;//the node of the linked list for this page/ page's node in the linked list (usually in free_area).
 	/* TODO: DECLARE NECESSARY MEMBER VARIABLES */
+	//add pointer to loctaion in g_memory
 } page_t;
 
 /**************************************************************************
  * Global Variables
  **************************************************************************/
 /* free lists*/
-struct list_head free_area[MAX_ORDER+1];
+struct list_head free_area[MAX_ORDER+1];//array of linked lists(one linked list for each order(0-11 not used due to MIN_ORDER = 12))//linked lists may not be very long.
 
 /* memory area */
-char g_memory[1<<MAX_ORDER];
+char g_memory[1<<MAX_ORDER];//actual/raw memory in bytes
 
 /* page structures */
-page_t g_pages[(1<<MAX_ORDER)/PAGE_SIZE];
+page_t g_pages[(1<<MAX_ORDER)/PAGE_SIZE];//array of pages (page_t) (in g_memory?)//page = mininum size unit(may be 4 bytes for example.)
 
 /**************************************************************************
  * Public Function Prototypes
@@ -79,18 +81,20 @@ page_t g_pages[(1<<MAX_ORDER)/PAGE_SIZE];
 void buddy_init()
 {
 	int i;
-	int n_pages = (1<<MAX_ORDER) / PAGE_SIZE;
+	int n_pages = (1<<MAX_ORDER) / PAGE_SIZE;//number of pages
 	for (i = 0; i < n_pages; i++) {
 		/* TODO: INITIALIZE PAGE STRUCTURES */
+		//point pointers to g_memory
 	}
 
 	/* initialize freelist */
-	for (i = MIN_ORDER; i <= MAX_ORDER; i++) {
-		INIT_LIST_HEAD(&free_area[i]);
+	for (i = MIN_ORDER; i <= MAX_ORDER; i++) {//from min to max order,[12 to 20]
+		INIT_LIST_HEAD(&free_area[i]);//init next and prev pointers of free area.(init free area lists)
 	}
 
+
 	/* add the entire memory as a freeblock */
-	list_add(&g_pages[0].list, &free_area[MAX_ORDER]);
+	list_add(&g_pages[0].list, &free_area[MAX_ORDER]);//add first page (o) of g_pages to the free area of max order
 }
 
 /**
@@ -110,6 +114,8 @@ void buddy_init()
 void *buddy_alloc(int size)
 {
 	/* TODO: IMPLEMENT THIS FUNCTION */
+
+
 	return NULL;
 }
 
