@@ -212,6 +212,9 @@ void buddy_free(void *addr)//need to check to not free a already freed page/bloc
 		list_del_init(&buddy->list);//remove from the free area list.
 		//remove buudy from free list, 
 		//go higher.
+		if(buddy<pg){
+			pg = buddy;
+		}
 	}
 	pg->order = i;
 	list_add(&pg->list,&free_area[i]);
