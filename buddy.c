@@ -158,6 +158,9 @@ void *buddy_alloc(int size)
 	int orderNeeded = sizeToOrder(size);//get order size.
 	//see if there is a open block of (exact) size orderNeeded.
 	int i;
+	if( orderNeeded == -1){
+		return NULL; //order cant be big enough
+	}
 	for (i = orderNeeded; i<= MAX_ORDER; i++){ //i = current order we are looking at.
 		if(!list_empty(&free_area[i])){//smallest page entry that is free.
 			//found it
