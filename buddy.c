@@ -32,8 +32,8 @@
 #define ADDR_TO_PAGE(addr) ((unsigned long)(((void *)(addr)) - (void *)g_memory) / PAGE_SIZE)//returns a page index from a mem pointer
 
 /* find buddy address */
-#define BUDDY_ADDR(addr, order) (void *)((((unsigned long)(addr) - (unsigned long)g_memory) ^ (1<<(order))) \ //returns a pointer to the memory's buddy.(args = address,order)
-									 + (unsigned long)g_memory)
+#define BUDDY_ADDR(addr, o) (void *)((((unsigned long)(addr) - (unsigned long)g_memory) ^ (1<<(o))) + (unsigned long)g_memory)//\ //returns a pointer to the memory's buddy.(args = address,order)
+									 
 
 
 
@@ -58,6 +58,8 @@ typedef struct {
 	int index;
 	char *mem;//pointer to location in g_memory
 	//may want to put the current page's order...(or may not.)
+	int order;//current 
+
 } page_t;
 
 /**************************************************************************
@@ -91,7 +93,8 @@ void buddy_init()
 		/* TODO: INITIALIZE PAGE STRUCTURES */
 		//point pointers to g_memory
 		g_pages[i].index = i;
-		g_pages[i].mem = PAGE_TO_ADDR(i);//questionable bounds!//check
+		g_pages[i].mem = PAGE_TO_ADDR(i);
+		g_pages[i].order = -1;//****************************************************
 		
 	}
 
@@ -99,7 +102,7 @@ void buddy_init()
 	for (i = MIN_ORDER; i <= MAX_ORDER; i++) {//from min to max order,[12 to 20]
 		INIT_LIST_HEAD(&free_area[i]);//init next and prev pointers of free area.(init free area lists)
 	}
-
+	g_pages[0].order = MAX_ORDER;//
 
 	/* add the entire memory as a freeblock */
 	list_add(&g_pages[0].list, &free_area[MAX_ORDER]);//add first page (o) of g_pages to the free area of max order
@@ -109,7 +112,7 @@ void buddy_init()
 int sizeToOrder(int size){
 	int o;
 	for (o = MIN_ORDER; o <= MAX_ORDER; o++) {
-		if ((1<<o) > size){
+		if ((1<<o) >= size){
 			return o;
 		}
 	}
@@ -127,11 +130,12 @@ int sizeToOrder(int size){
 
 */
 void breakdown(page_t* page,int currentOrder,int orderNeeded){
-if(currentOrder == OrderNeeded){
+if(currentOrder == orderNeeded){
 	return;
 }
 	page_t* buddy = &g_pages[ADDR_TO_PAGE(BUDDY_ADDR(page->mem,currentOrder-1))];//put back to free mem.
-	list_add(buddy->list,free_area[currentOrder-1]);//adds buddy to free area
+	buddy->order = currentOrder-1;
+	list_add(&(buddy->list),&free_area[currentOrder-1]);//adds buddy to free area
 	breakdown(page,currentOrder-1,orderNeeded);
 }
 /**
@@ -154,13 +158,15 @@ void *buddy_alloc(int size)
 	int orderNeeded = sizeToOrder(size);//get order size.
 	//see if there is a open block of (exact) size orderNeeded.
 	int i;
-	for (i = orderNeeded; i< MAX_ORDER; i++){ //i = current order we are looking at.
-		if(!list_empty(free_area[i]){//smallest page entry that is free.
+	for (i = orderNeeded; i<= MAX_ORDER; i++){ //i = current order we are looking at.
+		if(!list_empty(&free_area[i])){//smallest page entry that is free.
 			//found it
-			page_t *pg = list_entry(free_area[i],page_t,list);//get page., need to remove from free_area before breakdown.
-			list_del(pg->list);
+			page_t *pg = list_entry(free_area[i].next,page_t,list);//get page., need to remove from free_area before breakdown.
+			
+			list_del_init(&(pg->list));
 			breakdown(pg, i, orderNeeded);//pg's of the right size. and its buddy's(if we broke any blocks down, are reallocated to free_area)
-			return (void*))(pg->mem);
+			pg->order = orderNeeded;
+			return ((void*)(pg->mem));
 		}
 
 	}
@@ -177,20 +183,39 @@ void *buddy_alloc(int size)
  *
  * @param addr memory block address to be freed
  */
-void buddy_free(void *addr)
+void buddy_free(void *addr)//need to check to not free a already freed page/block.
 {
-	page_t * pg = g_pages[ADDR_TO_PAGE(addr)];
+	page_t * pg = &g_pages[ADDR_TO_PAGE(addr)];
 	int i;
+	int currentOrder=pg->order;
+	if((currentOrder<MIN_ORDER) || (currentOrder>MAX_ORDER)){
+		printf("Error: currentOrder out of bounds! currentOrder=%d",currentOrder);
+		while(1);
+	}   
 	//if currentOrder == Maxorder, just add to free_area at top level.
 	for(i = currentOrder; i<MAX_ORDER; i++){//for however far up we can go
 		//get the buddy,(if there is one!(toplevel does not have a buddy, and just needs to go back to free.))
-		if (){//if cant free buddy, break
+		page_t* buddy = &g_pages[ADDR_TO_PAGE(BUDDY_ADDR(pg->mem,i))];
+		char freed = 0;
+		struct list_head *pos;
+		list_for_each(pos,&free_area[i]){
+
+			if(list_entry(pos,page_t,list)==buddy){//if we find buddy in free area list,
+			//if(pos == ){
+				freed = 1;
+			}
+		}
+		if (!freed){//if cant free buddy, break
 			break;
 		}
+
+		list_del_init(&buddy->list);//remove from the free area list.
 		//remove buudy from free list, 
 		//go higher.
 	}
-	//if now add page to free area at level i.
+	pg->order = i;
+	list_add(&pg->list,&free_area[i]);
+	//now add page to free area at level i.
 
 	/* TODO: IMPLEMENT THIS FUNCTION */
 }
